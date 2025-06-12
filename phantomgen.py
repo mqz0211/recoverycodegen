@@ -2,10 +2,8 @@ import tkinter as tk
 from tkinter import ttk
 import secrets
 import os
-import pyautogui
-import threading
-import time
 
+# Path to your BIP-39 word list
 WORDLIST_PATH = r"C:\Users\User\hash\english.txt"
 
 def load_wordlist(path):
@@ -14,84 +12,66 @@ def load_wordlist(path):
     with open(path, "r", encoding="utf-8") as f:
         return [word.strip() for word in f.readlines()]
 
+# Generate one mnemonic
 def generate_mnemonic(wordlist, word_count):
     return " ".join(secrets.choice(wordlist) for _ in range(word_count))
 
-class LoopingMnemonicApp:
+# GUI App
+class MnemonicApp:
     def __init__(self, root):
-        self.root = root
         self.wordlist = load_wordlist(WORDLIST_PATH)
+
+        root.title("BIP-39 Mnemonic Generator")
+        root.geometry("850x600")
+
+        # Options
         self.word_count_var = tk.IntVar(value=12)
-        self.running = True
-        self.counter = 0
+        options_frame = ttk.Frame(root)
+        options_frame.pack(pady=10)
 
-        self.setup_ui()
-        threading.Thread(target=self.auto_loop, daemon=True).start()
+        ttk.Label(options_frame, text="Mnemonic Length:").pack(side=tk.LEFT)
+        ttk.Radiobutton(options_frame, text="12 words", variable=self.word_count_var, value=12).pack(side=tk.LEFT)
+        ttk.Radiobutton(options_frame, text="24 words", variable=self.word_count_var, value=24).pack(side=tk.LEFT)
+        ttk.Button(options_frame, text="Generate 20 Phrases", command=self.generate_all).pack(side=tk.LEFT, padx=10)
 
-    def setup_ui(self):
-        self.root.title("🔁 Auto Mnemonic Generator & Typer")
-        self.root.geometry("850x300")
+        # Result area with scrollbar
+        self.canvas = tk.Canvas(root)
+        self.frame = ttk.Frame(self.canvas)
+        self.scrollbar = ttk.Scrollbar(root, orient="vertical", command=self.canvas.yview)
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
 
-        controls = ttk.Frame(self.root)
-        controls.pack(pady=10)
+        self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.canvas.create_window((0, 0), window=self.frame, anchor="nw")
 
-        ttk.Label(controls, text="Words:").pack(side=tk.LEFT)
-        ttk.Radiobutton(controls, text="12", variable=self.word_count_var, value=12).pack(side=tk.LEFT)
-        ttk.Radiobutton(controls, text="24", variable=self.word_count_var, value=24).pack(side=tk.LEFT)
+        self.frame.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
 
-        stop_btn = ttk.Button(controls, text="Stop", command=self.stop_loop)
-        stop_btn.pack(side=tk.LEFT, padx=20)
+    def generate_all(self):
+        # Clear previous phrases
+        for widget in self.frame.winfo_children():
+            widget.destroy()
 
-        self.status_label = ttk.Label(self.root, text="Starting auto typing loop...")
-        self.status_label.pack()
+        word_count = self.word_count_var.get()
+        for i in range(20):
+            phrase = generate_mnemonic(self.wordlist, word_count)
+            row = ttk.Frame(self.frame)
+            row.pack(fill=tk.X, pady=5, padx=10)
 
-        self.counter_label = ttk.Label(self.root, text="Mnemonics pasted: 0")
-        self.counter_label.pack()
+            text = tk.Text(row, height=2, wrap="word", font=("Courier", 10))
+            text.insert("1.0", phrase)
+            text.configure(state="disabled", width=70)
+            text.pack(side=tk.LEFT, padx=(0, 10))
 
-        self.phrase_box = tk.Text(self.root, height=3, font=("Courier", 12), wrap="word", width=100)
-        self.phrase_box.pack(pady=10)
-        self.phrase_box.configure(state="disabled")
+            copy_btn = ttk.Button(row, text="Copy", command=lambda p=phrase: self.copy_to_clipboard(p))
+            copy_btn.pack(side=tk.LEFT)
 
-    def stop_loop(self):
-        self.running = False
-        self.status_label.config(text="🛑 Loop stopped.")
+    def copy_to_clipboard(self, phrase):
+        root.clipboard_clear()
+        root.clipboard_append(phrase)
+        root.update()  # now it stays on the clipboard after the app is closed
 
-    def auto_loop(self):
-        while self.running:
-            # Generate new phrase every loop
-            phrase = generate_mnemonic(self.wordlist, self.word_count_var.get())
-
-            # Update GUI text
-            self.phrase_box.configure(state="normal")
-            self.phrase_box.delete("1.0", tk.END)
-            self.phrase_box.insert("1.0", phrase)
-            self.phrase_box.configure(state="disabled")
-
-            # Copy to clipboard
-            self.root.clipboard_clear()
-            self.root.clipboard_append(phrase)
-            self.root.update()
-
-            self.status_label.config(text="📋 Copied. Auto-pasting in 3 seconds...")
-            time.sleep(3)
-
-            # Paste and press enter
-            pyautogui.write(phrase)
-            pyautogui.press("enter")
-
-            delay = 60 / 140  # BPM
-            for _ in range(13):
-                if not self.running:
-                    return
-                time.sleep(delay)
-                pyautogui.press("enter")
-
-            self.counter += 1
-            self.counter_label.config(text=f"Mnemonics pasted: {self.counter}")
-            self.status_label.config(text="✅ Done. Generating next in 2s...")
-            time.sleep(2)
-
+# Run the app
 if __name__ == "__main__":
     root = tk.Tk()
-    app = LoopingMnemonicApp(root)
+    app = MnemonicApp(root)
     root.mainloop()
