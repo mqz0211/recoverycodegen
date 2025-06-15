@@ -6,7 +6,7 @@ import pyautogui
 import threading
 import time
 
-WORDLIST_PATH = r"C:\Users\User\hash\english.txt"
+WORDLIST_PATH = r"Change to your english.txt directory"
 
 def load_wordlist(path):
     if not os.path.exists(path):
